@@ -91,6 +91,19 @@ def update_log_panel(panel, logs, max_logs=MAX_LOG_DISPLAY):
     
     return panel
 
+def write_log_to_file(log_entry):
+    """
+    将日志条目写入文件
+    Args:
+        log_entry: 包含行为、识别状态和时间的日志字典
+    """
+    log_dir = './logs'
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    log_path = os.path.join(log_dir, 'log.txt')
+    with open(log_path, 'a', encoding='utf-8') as f:
+        f.write(f"[{log_entry['time']}] {log_entry['behavior']} - 已识别: {log_entry['recognized']}\n")
+
 def main():
     # 初始化摄像头
     cap = cv2.VideoCapture(0)
@@ -164,35 +177,41 @@ def main():
             # 检查当前是否在安全区域内
             if is_in_safe_zone(obj['bbox'], safe_zone):
                 if obj['id'] not in alerted_objects:
-                    current_time = datetime.now().strftime("%H:%M:%S.%f")[:-3]
-                    logs.append({
+                    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # 调整时间格式
+                    log_entry = {
                         'behavior': f"{label}进入预警区域",
                         'recognized': "是",
                         'time': current_time
-                    })
+                    }
+                    logs.append(log_entry)
                     print(f"警告：{label} 进入预警区域！")
                     alerted_objects.add(obj['id'])
+                    write_log_to_file(log_entry)  # 写入日志文件
             else:
                 if obj['id'] in alerted_objects:
-                    current_time = datetime.now().strftime("%H:%M:%S.%f")[:-3]
-                    logs.append({
+                    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # 调整时间格式
+                    log_entry = {
                         'behavior': f"{label}离开预警区域",
                         'recognized': "是",
                         'time': current_time
-                    })
+                    }
+                    logs.append(log_entry)
+                    write_log_to_file(log_entry)  # 写入日志文件
                     alerted_objects.remove(obj['id'])
 
             # 检查预测位置是否在安全区域内
             if is_in_safe_zone(obj['future_bbox'], safe_zone):
                 if obj['id'] not in predicted_alerted_objects:
-                    current_time = datetime.now().strftime("%H:%M:%S.%f")[:-3]
-                    logs.append({
+                    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # 调整时间格式
+                    log_entry = {
                         'behavior': f"{label}预计进入预警区域",
                         'recognized': "是",
                         'time': current_time
-                    })
+                    }
+                    logs.append(log_entry)
                     print(f"预警：{label} 预计10秒内将进入预警区域！")
                     predicted_alerted_objects.add(obj['id'])
+                    write_log_to_file(log_entry)  # 写入日志文件
             else:
                 if obj['id'] in predicted_alerted_objects:
                     predicted_alerted_objects.remove(obj['id'])
