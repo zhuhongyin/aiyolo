@@ -2,11 +2,11 @@ from ultralytics import YOLO
 import numpy as np
 
 class YOLODetector:
-    def __init__(self, model_path='yolo11n.pt'):
+    def __init__(self, model_path='yolo12n.pt'):
         """
         初始化YOLO检测器
         Args:
-            model_path: YOLO模型路径，默认使用yolo11n.pt
+            model_path: YOLO模型路径，默认使用yolo12n.pt
         """
         self.model = YOLO(model_path)
         # 定义目标类别

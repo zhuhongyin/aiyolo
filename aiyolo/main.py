@@ -112,7 +112,7 @@ def main():
         return
 
     # 检查模型文件是否存在
-    model_path = 'yolo11n.pt'
+    model_path = 'yolo12n.pt'
     if not os.path.exists(model_path):
         print(f"错误：找不到模型文件 {model_path}")
         print("请手动下载模型文件例如yolov8n.pt、yolo11n.pt并放置在项目根目录：")
@@ -189,14 +189,15 @@ def main():
                     write_log_to_file(log_entry)  # 写入日志文件
             else:
                 if obj['id'] in alerted_objects:
-                    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # 调整时间格式
-                    log_entry = {
-                        'behavior': f"{label}离开预警区域",
-                        'recognized': "是",
-                        'time': current_time
-                    }
-                    logs.append(log_entry)
-                    write_log_to_file(log_entry)  # 写入日志文件
+                    # # 离开预警区域时，不记录日志
+                    # current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # 调整时间格式
+                    # log_entry = {
+                    #     'behavior': f"{label}离开预警区域",
+                    #     'recognized': "是",
+                    #     'time': current_time
+                    # }
+                    # logs.append(log_entry)
+                    # write_log_to_file(log_entry)  # 写入日志文件
                     alerted_objects.remove(obj['id'])
 
             # 检查预测位置是否在安全区域内
