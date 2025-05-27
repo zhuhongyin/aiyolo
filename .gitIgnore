@@ -1,5 +1,9 @@
 .venv
 yolov8n.pt
 yolo11n.pt
+*.pt
+*.pyc
+*.zip
+logs
 
 

@@ -2,7 +2,7 @@ from ultralytics import YOLO
 import numpy as np
 
 class YOLODetector:
-    def __init__(self, model_path='yolo12n.pt'):
+    def __init__(self, model_path='yolo11n.pt'):
         """
         初始化YOLO检测器
         Args:
@@ -26,7 +26,7 @@ class YOLODetector:
             detections: 检测结果列表，每个元素包含类别、置信度和边界框
         """
         # 设置verbose=False来关闭性能信息输出
-        results = self.model(frame, verbose=False)
+        results = self.model(frame, verbose=False, conf=0.5)
         detections = []
         
         for r in results:

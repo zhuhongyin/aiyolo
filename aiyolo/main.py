@@ -112,7 +112,7 @@ def main():
         return
 
     # 检查模型文件是否存在
-    model_path = 'yolo12n.pt'
+    model_path = 'yolo11n.pt'
     if not os.path.exists(model_path):
         print(f"错误：找不到模型文件 {model_path}")
         print("请手动下载模型文件例如yolov8n.pt、yolo11n.pt并放置在项目根目录：")
