@@ -1,5 +1,9 @@
 .venv
 yolov8n.pt
 yolo11n.pt
+yolo12n.pt
+yolo12s.pt
+aiyolo-追踪多个乱.zip
+*.pyc
 
 

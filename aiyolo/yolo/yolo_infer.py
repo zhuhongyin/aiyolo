@@ -11,12 +11,9 @@ class YOLODetector:
         self.model = YOLO(model_path)
         # 定义目标类别
         self.classes = {
-            0: 'person',
-            27: 'backpack',
-            28: 'umbrella',
-            31: 'handbag',
-            32: 'tie',
-            33: 'suitcase'
+            0: 'person',    # 人
+            39: 'bottle',   # 瓶子
+            66: 'keyboard', # 键盘
         }
 
     def detect(self, frame):
@@ -28,7 +25,7 @@ class YOLODetector:
             detections: 检测结果列表，每个元素包含类别、置信度和边界框
         """
         # 设置verbose=False来关闭性能信息输出
-        results = self.model(frame, verbose=False)
+        results = self.model(frame, verbose=True)
         detections = []
         
         for r in results:

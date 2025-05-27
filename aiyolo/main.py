@@ -1,12 +1,20 @@
 import cv2
 import numpy as np
 from yolo.yolo_infer import YOLODetector
-from tracking.tracker import SimpleTracker
+# from tracking.tracker import SimpleTracker
+# from tracking.simpletracker import SimpleTracker
+from tracking.deepsort import DeepSORTTracker
 from utils import draw_bbox, draw_trajectory, is_in_safe_zone, calculate_distance
 import os
-import time
+# import time
 from datetime import datetime
+import warnings
+import warnings
 from PIL import Image, ImageDraw, ImageFont
+
+# Suppress libpng warnings
+warnings.filterwarnings("ignore", message="iCCP: cHRM chunk does not match sRGB")
+
 
 def put_chinese_text(img, text, position, text_color=(0, 0, 0), text_size=20):
     """
@@ -107,6 +115,13 @@ def write_log_to_file(log_entry):
 def main():
     # 初始化摄像头
     cap = cv2.VideoCapture(0)
+    # cap = cv2.VideoCapture("rtsp://admin:dtct123456@10.10.140.144")
+    #设置缓冲区大小
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 10)
+    # 禁用自动白平衡
+    cap.set(cv2.CAP_PROP_AUTO_WB, 0)
+    # 设置视频编码
+    cap.set(cv2.CAP_PROP_FOURCC,cv2.VideoWriter.fourcc(*'X264'))
     if not cap.isOpened():
         print("无法打开摄像头")
         return
@@ -120,10 +135,11 @@ def main():
 
     # 初始化检测器和跟踪器
     detector = YOLODetector(model_path)
-    tracker = SimpleTracker()
+    # from tracking.deepsort import DeepSORTTracker
+    tracker = DeepSORTTracker()
 
     # 获取屏幕分辨率
-    screen_width = 1920  # 可以根据实际屏幕调整
+    screen_width = 1600  # 可以根据实际屏幕调整
     screen_height = 1080
 
     # 计算左右区域宽度
@@ -179,25 +195,25 @@ def main():
                 if obj['id'] not in alerted_objects:
                     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # 调整时间格式
                     log_entry = {
-                        'behavior': f"{label}进入预警区域",
+                        'behavior': f"{label}*进入预警区域",
                         'recognized': "是",
                         'time': current_time
                     }
                     logs.append(log_entry)
-                    print(f"警告：{label} 进入预警区域！")
+                    print(f"警告：{label}*进入预警区域！")
                     alerted_objects.add(obj['id'])
                     write_log_to_file(log_entry)  # 写入日志文件
             else:
                 if obj['id'] in alerted_objects:
-                    # # 离开预警区域时，不记录日志
-                    # current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # 调整时间格式
-                    # log_entry = {
-                    #     'behavior': f"{label}离开预警区域",
-                    #     'recognized': "是",
-                    #     'time': current_time
-                    # }
-                    # logs.append(log_entry)
-                    # write_log_to_file(log_entry)  # 写入日志文件
+                    # 离开预警区域时，不记录日志
+                    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # 调整时间格式
+                    log_entry = {
+                        'behavior': f"{label}离开预警区域",
+                        'recognized': "是",
+                        'time': current_time
+                    }
+                    logs.append(log_entry)
+                    write_log_to_file(log_entry)  # 写入日志文件
                     alerted_objects.remove(obj['id'])
 
             # 检查预测位置是否在安全区域内
@@ -210,7 +226,7 @@ def main():
                         'time': current_time
                     }
                     logs.append(log_entry)
-                    print(f"预警：{label} 预计10秒内将进入预警区域！")
+                    print(f"预警：{label} 预计5秒内将进入预警区域！")
                     predicted_alerted_objects.add(obj['id'])
                     write_log_to_file(log_entry)  # 写入日志文件
             else:
