@@ -26,8 +26,26 @@ class YOLODetector:
             detections: 检测结果列表（包含跟踪ID、类别、置信度、边界框）
         """
         # 启用跟踪并设置置信度阈值（conf=0.5）
+        # 初始化前帧置信度缓存（首次调用时）
+        if not hasattr(self, 'prev_confidences'):
+            self.prev_confidences = None
+
+        # 执行YOLO跟踪推理
         results = self.model.track(frame, verbose=False, conf=0.6, tracker="bytetrack.yaml")  # 使用ByteTrack跟踪算法
         detections = []
+
+        # 获取当前帧置信度（用于后续缓存）
+        current_confidences = [float(box.conf[0]) for r in results for box in r.boxes if int(box.cls[0]) in self.classes]
+
+        # 叠加前帧置信度（解决识别框闪烁）
+        if self.prev_confidences is not None:
+            # 按索引匹配前后帧置信度（简单实现），权重0.3平衡平滑性
+            min_len = min(len(current_confidences), len(self.prev_confidences))
+            for i in range(min_len):
+                current_confidences[i] += self.prev_confidences[i] * 0.5  # 可调整权重系数（建议0.05~0.5）
+
+        # 更新前帧置信度缓存（供下一帧使用）
+        self.prev_confidences = current_confidences.copy()
         
         for r in results:
             for box in r.boxes:

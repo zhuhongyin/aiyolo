@@ -65,12 +65,12 @@ def update_log_panel(panel, logs, max_logs=MAX_LOG_DISPLAY):
     panel = put_chinese_text(panel, "行为分析日志", (10, 10), text_size=24)
 
     # 设置固定列宽
-    col_widths = [300, 64, 116]  # 行为分析/已识别/时间
+    col_widths = [270, 64, 146]  # 行为分析/已识别/时间
     # 绘制表头
     headers = ["行为分析", "已识别", "时间"]
     for i, header in enumerate(headers):
         x = sum(col_widths[:i]) + 10 * i  # 根据列宽计算位置
-        panel = put_chinese_text(panel, header, (x, 50), text_size=20)
+        panel = put_chinese_text(panel, header, (x, 50), text_size=18)
 
     # 显示最新日志（倒序显示）
     visible_logs = logs[-max_logs:]
@@ -79,15 +79,15 @@ def update_log_panel(panel, logs, max_logs=MAX_LOG_DISPLAY):
         try:
             behavior = log['behavior'][:20]   # 截断防止溢出
             recognized = log['recognized'][:10]
-            time_str = log['time'][:15]
+            time_str = log['time'][:20]
         except KeyError as e:
             print(f"Missing key in log entry: {e}")
             continue
 
         # 使用固定列宽绘制内容
         panel = put_chinese_text(panel, behavior, (10, y), text_size=16)
-        panel = put_chinese_text(panel, recognized, (310, y), text_size=16)  # 400+10
-        panel = put_chinese_text(panel, time_str, (384, y), text_size=16)  # 400+64+20
+        panel = put_chinese_text(panel, recognized, (270, y), text_size=16)  # 400+10
+        panel = put_chinese_text(panel, time_str, (344, y), text_size=16)  # 400+64+20
     
     return panel
 
@@ -107,14 +107,10 @@ def write_log_to_file(log_entry):
 def main():
     # 初始化摄像头
     cap = cv2.VideoCapture(0)
+    # cap = cv2.VideoCapture("rtsp://admin:dtct123456@10.10.140.144")
     if not cap.isOpened():
         print("无法打开摄像头")
         return
-    # # 初始化摄像头
-    # cap = cv2.VideoCapture("rtsp://admin:dtct123456@10.10.140.144")
-    # if not cap.isOpened():
-    #     print("无法打开摄像头")
-    #     return  # 直接退出避免后续崩溃
     # 设置缓冲区大小
     # cap.set(cv2.CAP_PROP_BUFFERSIZE, 10)
     # 禁用自动白平衡
@@ -153,9 +149,11 @@ def main():
         2 * frame_height // 3
     ]
 
-    # 用于记录已经报警的目标
+    # 用于记录已经报警的目标及最后报警时间（时间窗口去重）
     alerted_objects = set()
     predicted_alerted_objects = set()
+    last_alert_times = {}  # 格式：{id: 最后报警时间戳}
+    last_predicted_alert_times = {}  # 格式：{id: 最后预测报警时间戳}
     
     # 初始化日志列表（使用deque限制最大长度）
     from collections import deque
@@ -187,18 +185,43 @@ def main():
             label = f"{obj['class_name']} ID:{obj['id']}"
             frame = draw_bbox(frame, obj['bbox'], label)
 
-            # 检查当前是否在安全区域内
-            if is_in_safe_zone(obj['bbox'], safe_zone):
-                if obj['id'] not in alerted_objects:
+            # 检查预测位置是否在安全区域内
+            if is_in_safe_zone(obj['future_bbox'], safe_zone):
+                current_timestamp = time.time()  # 获取当前时间戳（秒）
+                # 检查20秒内是否已预测报警
+                last_predicted_alert = last_predicted_alert_times.get(obj['id'], 0)
+                if obj['id'] not in predicted_alerted_objects or (current_timestamp - last_predicted_alert) > 20:
                     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # 调整时间格式
                     log_entry = {
-                        'behavior': f"{label}进入预警区域",
+                        'behavior': f"{label} 将在5s内进入预警区域。",
+                        'recognized': "是",
+                        'time': current_time
+                    }
+                    logs.append(log_entry)
+                    print(f"预警：{label} 预计5秒内将进入预警区域！")
+                    predicted_alerted_objects.add(obj['id'])
+                    last_predicted_alert_times[obj['id']] = current_timestamp  # 存储浮点数时间戳
+                    write_log_to_file(log_entry)  # 写入日志文件
+            else:
+                if obj['id'] in predicted_alerted_objects:
+                    predicted_alerted_objects.remove(obj['id'])
+            
+            # 检查当前是否在安全区域内
+            if is_in_safe_zone(obj['bbox'], safe_zone):
+                current_timestamp = time.time()  # 获取当前时间戳（秒）
+                # 检查20秒内是否已报警
+                last_alert = last_alert_times.get(obj['id'], 0)
+                if obj['id'] not in alerted_objects or (current_timestamp - last_alert) > 20:
+                    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # 调整时间格式
+                    log_entry = {
+                        'behavior': f"{label} 进入预警区域！",
                         'recognized': "是",
                         'time': current_time
                     }
                     logs.append(log_entry)
                     print(f"警告：{label} 进入预警区域！")
                     alerted_objects.add(obj['id'])
+                    last_alert_times[obj['id']] = current_timestamp  # 存储浮点数时间戳
                     write_log_to_file(log_entry)  # 写入日志文件
             else:
                 if obj['id'] in alerted_objects:
@@ -212,23 +235,6 @@ def main():
                     # logs.append(log_entry)
                     # write_log_to_file(log_entry)  # 写入日志文件
                     alerted_objects.remove(obj['id'])
-
-            # 检查预测位置是否在安全区域内
-            if is_in_safe_zone(obj['future_bbox'], safe_zone):
-                if obj['id'] not in predicted_alerted_objects:
-                    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # 调整时间格式
-                    log_entry = {
-                        'behavior': f"{label}预计进入预警区域",
-                        'recognized': "是",
-                        'time': current_time
-                    }
-                    logs.append(log_entry)
-                    print(f"预警：{label} 预计10秒内将进入预警区域！")
-                    predicted_alerted_objects.add(obj['id'])
-                    write_log_to_file(log_entry)  # 写入日志文件
-            else:
-                if obj['id'] in predicted_alerted_objects:
-                    predicted_alerted_objects.remove(obj['id'])
 
         # 更新日志面板
         log_panel = update_log_panel(log_panel, list(logs))  # 修复：保存返回值以更新面板
@@ -250,4 +256,4 @@ def main():
     cv2.destroyAllWindows()
 
 if __name__ == '__main__':
-    main() 
+    main()
