@@ -110,6 +110,19 @@ def main():
     if not cap.isOpened():
         print("无法打开摄像头")
         return
+    # # 初始化摄像头
+    # cap = cv2.VideoCapture("rtsp://admin:dtct123456@10.10.140.144")
+    # if not cap.isOpened():
+    #     print("无法打开摄像头")
+    #     return  # 直接退出避免后续崩溃
+    # 设置缓冲区大小
+    # cap.set(cv2.CAP_PROP_BUFFERSIZE, 10)
+    # 禁用自动白平衡
+    cap.set(cv2.CAP_PROP_AUTO_WB, 0)
+    # 设置视频编码
+    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter.fourcc(*'X264'))
+    # assert cap.isOpened(), "Error reading video file"
+        
 
     # 检查模型文件是否存在
     model_path = 'yolo11n.pt'
