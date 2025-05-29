@@ -30,6 +30,20 @@ class SimpleTracker:
         """
         return np.sqrt((center1[0] - center2[0])**2 + (center1[1] - center2[1])**2)
 
+    def _calculate_iou(self, bbox1, bbox2):
+        """
+        计算两个边界框的交并比
+        """
+        x1, y1, x2, y2 = bbox1
+        x3, y3, x4, y4 = bbox2
+        xi1, yi1 = max(x1, x3), max(y1, y3)
+        xi2, yi2 = min(x2, x4), min(y2, y4)
+        intersection_area = max(0, xi2 - xi1) * max(0, yi2 - yi1)
+        bbox1_area = (x2 - x1) * (y2 - y1)
+        bbox2_area = (x4 - x3) * (y4 - y3)
+        union_area = bbox1_area + bbox2_area - intersection_area
+        return intersection_area / union_area if union_area > 0 else 0
+
     def calculate_velocity(self, trajectory):
         """
         计算目标速度
@@ -119,6 +133,7 @@ class SimpleTracker:
             det_class = det['class_name']
             best_match = None
             best_distance = float('inf')
+            best_score = float('inf')  # 初始化最佳分数为正无穷大
             for track_id, track_center in existing_centers.items():
                 track_info = self.tracks[track_id]
                 if track_info['matched']:
@@ -127,7 +142,14 @@ class SimpleTracker:
                 if track_info['class_name'] != det_class:
                     continue
                 distance = self.calculate_distance(det_center, track_center)
-                if distance < best_distance and distance < self.max_distance:
+                iou = self._calculate_iou(det['bbox'], track_info['current_bbox'])
+                # 综合距离（归一化到0-1）和IOU（0-1）作为匹配分数，IOU权重更高
+                distance_score = distance / self.max_distance  # 距离越小分数越低（0最优）
+                iou_score = 1 - iou  # IOu越大分数越低（0最优）
+                total_score = 0.3 * distance_score + 0.7 * iou_score  # 调整权重
+                if total_score < best_score:
+                    best_score = total_score
+                    best_match = track_id
                     best_distance = distance
                     best_match = track_id
             if best_match is not None:
