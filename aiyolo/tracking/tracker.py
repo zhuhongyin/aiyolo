@@ -4,7 +4,7 @@ from collections import deque
 import time
 
 class SimpleTracker:
-    def __init__(self, max_track_length=30, max_missed=55):
+    def __init__(self, max_track_length=60, max_missed=55):
         """
         初始化跟踪器
         Args:
