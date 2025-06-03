@@ -121,7 +121,7 @@ def main():
         
 
     # 检查模型文件是否存在
-    model_path = 'yolo11n.pt'
+    model_path = 'yolo11s.pt'
     if not os.path.exists(model_path):
         print(f"错误：找不到模型文件 {model_path}")
         print("请手动下载模型文件例如yolov8n.pt、yolo11n.pt并放置在项目根目录：")
@@ -188,9 +188,9 @@ def main():
             # 检查预测位置是否在安全区域内
             if is_in_safe_zone(obj['future_bbox'], safe_zone):
                 current_timestamp = time.time()  # 获取当前时间戳（秒）
-                # 检查20秒内是否已预测报警
+                # 检查180秒内是否已预测报警
                 last_predicted_alert = last_predicted_alert_times.get(obj['id'], 0)
-                if obj['id'] not in predicted_alerted_objects or (current_timestamp - last_predicted_alert) > 20:
+                if obj['id'] not in predicted_alerted_objects or (current_timestamp - last_predicted_alert) > 180:
                     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # 调整时间格式
                     log_entry = {
                         'behavior': f"{label} 将在5s内进入预警区域。",
@@ -209,9 +209,9 @@ def main():
             # 检查当前是否在安全区域内
             if is_in_safe_zone(obj['bbox'], safe_zone):
                 current_timestamp = time.time()  # 获取当前时间戳（秒）
-                # 检查20秒内是否已报警
+                # 检查180秒内是否已报警
                 last_alert = last_alert_times.get(obj['id'], 0)
-                if obj['id'] not in alerted_objects or (current_timestamp - last_alert) > 20:
+                if obj['id'] not in alerted_objects or (current_timestamp - last_alert) > 180:
                     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # 调整时间格式
                     log_entry = {
                         'behavior': f"{label} 进入预警区域！",
