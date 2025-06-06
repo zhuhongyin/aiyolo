@@ -265,13 +265,11 @@ def main():
         global current_frame
         current_frame = combined_frame
 
-        # 按ESC退出
-        if cv2.waitKey(1) & 0xFF == 27:
-            cap.release()
-            cv2.destroyAllWindows()
-            break
+        # 持续处理视频流， 在视频处理循环中，即使不需要检测按键，也需要调用这个函数来保持窗口响应。
+        # 等待键盘输入 ：暂停程序执行1毫秒，等待用户按键输入
+        cv2.waitKey(1) 
 
-    # 资源释放已在ESC检测中处理
+    # 服务器关闭时会自动调用cleanup_resources()
 
 # 全局变量存储当前帧
 current_frame = None
