@@ -27,20 +27,17 @@ def put_chinese_text(img, text, position, text_color=(0, 0, 0), text_size=20):
 
 def create_log_panel(width, height):
     """
-    创建日志面板
+    创建日志面板（下半部分固定高度260px）
     """
     # 创建浅灰色背景 (RGB: 240, 240, 240)
     panel = np.ones((height, width, 3), dtype=np.uint8) * 240
     
-    # 绘制标题
-    panel = put_chinese_text(panel, "行为分析日志", (10, 10), text_size=24)
-    
-    # 绘制表头
-    headers = ["行为分析", "已识别", "时间"]
-    col_width = width // 3
+    # 绘制表头（取消标题，列宽为屏幕1/3）
+    headers = ["行为分析", "已识别", "识别时间"]
+    col_width = width // 3  # 每列宽度为屏幕宽度的1/3
     for i, header in enumerate(headers):
-        x = i * col_width + 10
-        panel = put_chinese_text(panel, header, (x, 50), text_size=20)
+        x = i * col_width + 10  # 根据1/3宽度计算位置
+        panel = put_chinese_text(panel, header, (x, 20), text_size=20)  # 调整y坐标适应无标题
     
     return panel
 
@@ -62,32 +59,38 @@ def update_log_panel(panel, logs, max_logs=MAX_LOG_DISPLAY):
     panel[:] = BACKGROUND_COLOR
 
     # 绘制标题
-    panel = put_chinese_text(panel, "行为分析日志", (10, 10), text_size=24)
+    # panel = put_chinese_text(panel, "行为分析日志", (10, 10), text_size=24)
 
-    # 设置固定列宽
-    col_widths = [270, 64, 146]  # 行为分析/已识别/时间
-    # 绘制表头
-    headers = ["行为分析", "已识别", "时间"]
+    # 设置固定列宽为屏幕1/3
+    # col_width = panel.shape[1] // 3  # 使用面板实际宽度计算列宽
+    # col_width = 340  # 固定列宽为340px
+    col_width = 640  # 固定列宽为640px
+    col_width2 = 1280  # 固定2列宽为1280px
+    
+    # 绘制表头（与create_log_panel列标题对齐）
+    headers = ["行为分析", "已识别", "识别时间"]
     for i, header in enumerate(headers):
-        x = sum(col_widths[:i]) + 10 * i  # 根据列宽计算位置
-        panel = put_chinese_text(panel, header, (x, 50), text_size=18)
+        x = i * col_width + 10  # 根据1/3宽度计算位置
+        panel = put_chinese_text(panel, header, (x, 20), text_size=18)  # 调整y坐标适应无标题
 
-    # 显示最新日志（倒序显示）
-    visible_logs = logs[-max_logs:]
-    for i, log in enumerate(reversed(visible_logs)):
-        y = 90 + i * 25
-        try:
-            behavior = log['behavior'][:20]   # 截断防止溢出
-            recognized = log['recognized'][:10]
-            time_str = log['time'][:20]
-        except KeyError as e:
-            print(f"Missing key in log entry: {e}")
-            continue
+    # 显示最新日志（倒序显示），动态计算行高
+        visible_logs = logs[-max_logs:]
+        text_height = 20  # 根据text_size=16调整，预留4px边距
+        for i, log in enumerate(reversed(visible_logs)):
+            y = 90 + i * (text_height + 8)  # 行高=文字高度+8px间距
+            try:
+                # 取消截断限制，通过调整列宽保证显示
+                behavior = log['behavior']
+                recognized = log['recognized']
+                time_str = log['time']
+            except KeyError as e:
+                print(f"Missing key in log entry: {e}")
+                continue
 
-        # 使用固定列宽绘制内容
-        panel = put_chinese_text(panel, behavior, (10, y), text_size=16)
-        panel = put_chinese_text(panel, recognized, (270, y), text_size=16)  # 400+10
-        panel = put_chinese_text(panel, time_str, (344, y), text_size=16)  # 400+64+20
+            # 调整列宽匹配文字显示需求
+            panel = put_chinese_text(panel, behavior, (10, y), text_size=16)
+            panel = put_chinese_text(panel, recognized, (col_width , y), text_size=16)  # 行为分析列宽扩展至340px
+            panel = put_chinese_text(panel, time_str, (col_width2 , y), text_size=16)  # 识别时间列左移
     
     return panel
 
@@ -120,7 +123,7 @@ def main():
     # cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter.fourcc(*'X264'))
 
     # 检查模型文件是否存在
-    model_path = 'yolo11s.pt'
+    model_path = 'yolo11n.pt'
     if not os.path.exists(model_path):
         print(f"错误：找不到模型文件 {model_path}")
         print("请手动下载模型文件例如yolov8n.pt、yolo11n.pt并放置在项目根目录：")
@@ -170,8 +173,8 @@ def main():
         # 目标跟踪
         tracked_objects = tracker.update(frame, detections)
 
-        # 创建日志面板
-        log_panel = create_log_panel(580, screen_height)  # 固定宽度为580px
+        # 创建日志面板 col_width = panel.shape[1] // 3
+        log_panel = create_log_panel(screen_width, 260)  # 固定宽度为580px
 
         # 绘制安全区域
         cv2.rectangle(frame, (safe_zone[0], safe_zone[1]), 
@@ -184,68 +187,80 @@ def main():
             label = f"{obj['class_name']} ID:{obj['id']}"
             frame = draw_bbox(frame, obj['bbox'], label)
 
-            # 检查预测位置是否在安全区域内
+            # 提取类别名称（用于区分人员/违禁物品）
+            class_name = obj['class_name']
+            
+            # 基础识别事件（已识别【人员】/【违禁物品】）
+            base_behavior = f"已识别【{class_name}】" if class_name in ["人员", "违禁物品"] else ""
+            if base_behavior:
+                current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                logs.append({
+                    'behavior': base_behavior,
+                    'recognized': "是",
+                    'time': current_time
+                })
+
+            # 检查预测位置是否在安全区域内（即将进入）
             if is_in_safe_zone(obj['future_bbox'], safe_zone):
-                current_timestamp = time.time()  # 获取当前时间戳（秒）
-                # 检查180秒内是否已预测报警
+                current_timestamp = time.time()
                 last_predicted_alert = last_predicted_alert_times.get(obj['id'], 0)
                 if obj['id'] not in predicted_alerted_objects or (current_timestamp - last_predicted_alert) > 180:
-                    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # 调整时间格式
+                    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     log_entry = {
-                        'behavior': f"{label} 将在5s内进入预警区域。",
+                        'behavior': f"已识别【{class_name}】即将进入安全区域",
                         'recognized': "是",
                         'time': current_time
                     }
                     logs.append(log_entry)
-                    print(f"预警：{label} 预计5秒内将进入预警区域！")
+                    print(f"预警：{label} 预计5秒内将进入安全区域！")
                     predicted_alerted_objects.add(obj['id'])
-                    last_predicted_alert_times[obj['id']] = current_timestamp  # 存储浮点数时间戳
-                    write_log_to_file(log_entry)  # 写入日志文件
+                    last_predicted_alert_times[obj['id']] = current_timestamp
+                    write_log_to_file(log_entry)
             else:
                 if obj['id'] in predicted_alerted_objects:
                     predicted_alerted_objects.remove(obj['id'])
-            
-            # 检查当前是否在安全区域内
+
+            # 检查当前是否在安全区域内（已进入）
             if is_in_safe_zone(obj['bbox'], safe_zone):
-                current_timestamp = time.time()  # 获取当前时间戳（秒）
-                # 检查180秒内是否已报警
+                current_timestamp = time.time()
                 last_alert = last_alert_times.get(obj['id'], 0)
                 if obj['id'] not in alerted_objects or (current_timestamp - last_alert) > 180:
-                    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # 调整时间格式
+                    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     log_entry = {
-                        'behavior': f"{label} 进入预警区域！",
+                        'behavior': f"已识别【{class_name}】进入安全区域",
                         'recognized': "是",
                         'time': current_time
                     }
                     logs.append(log_entry)
-                    print(f"警告：{label} 进入预警区域！")
+                    print(f"警告：{label} 进入安全区域！")
                     alerted_objects.add(obj['id'])
-                    last_alert_times[obj['id']] = current_timestamp  # 存储浮点数时间戳
-                    write_log_to_file(log_entry)  # 写入日志文件
+                    last_alert_times[obj['id']] = current_timestamp
+                    write_log_to_file(log_entry)
             else:
                 if obj['id'] in alerted_objects:
-                    # # 离开预警区域时，不记录日志
-                    # current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # 调整时间格式
-                    # log_entry = {
-                    #     'behavior': f"{label}离开预警区域",
-                    #     'recognized': "是",
-                    #     'time': current_time
-                    # }
-                    # logs.append(log_entry)
-                    # write_log_to_file(log_entry)  # 写入日志文件
                     alerted_objects.remove(obj['id'])
 
         # 更新日志面板
         log_panel = update_log_panel(log_panel, list(logs))  # 修复：保存返回值以更新面板
 
-        # 调整主画面大小
-        frame = cv2.resize(frame, (left_width, screen_height))
+        # 调整主画面大小（上半部分高度为屏幕高度-260px）
+        video_height = screen_height - 260
+        frame = cv2.resize(frame, (screen_width, video_height))  # 宽度自适应屏幕
 
-        # 水平拼接主画面和日志面板
-        combined_frame = np.hstack((frame, log_panel))
+        # 调整日志面板大小（下半部分固定高度260px，宽度与视频区域一致）
+        log_panel = cv2.resize(log_panel, (screen_width, 260))
+
+        # 垂直拼接主画面和日志面板
+        combined_frame = np.vstack((frame, log_panel))
 
         # 显示结果
-        cv2.imshow('AIYolo Tracking', combined_frame)
+        # 将帧存入全局变量供Flask使用
+        global current_frame
+        current_frame = combined_frame
+
+        # 按ESC退出
+        if cv2.waitKey(1) & 0xFF == 27:
+            break
 
         # 按ESC退出
         if cv2.waitKey(1) & 0xFF == 27:
@@ -254,5 +269,31 @@ def main():
     cap.release()
     cv2.destroyAllWindows()
 
+# 全局变量存储当前帧
+current_frame = None
+
 if __name__ == '__main__':
-    main()
+    # 启动Flask服务器
+    from flask import Flask, Response
+    app = Flask(__name__)
+
+    def generate_frames():
+        while True:
+            if current_frame is not None:
+                # 编码为JPEG格式
+                ret, buffer = cv2.imencode('.jpg', current_frame)
+                frame = buffer.tobytes()
+                yield (b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+
+    @app.route('/video_feed')
+    def video_feed():
+        return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+    # 启动视频处理线程
+    import threading
+    video_thread = threading.Thread(target=main)
+    video_thread.daemon = True
+    video_thread.start()
+
+    # 启动Flask服务器
+    app.run(host='0.0.0.0', port=5000, threaded=True)
