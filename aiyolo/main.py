@@ -110,14 +110,16 @@ def write_log_to_file(log_entry):
 def main():
     # 初始化摄像头
     # cap = cv2.VideoCapture("rtsp://admin:dtct123456@10.10.140.144")
-    cap = cv2.VideoCapture(0)
-    if not cap.isOpened():
-        print("无法打开摄像头")
-        # 清理已分配的资源
-        # if 'detector' in locals():
-        #     del detector
-        # if 'tracker' in locals():
-        #     del tracker
+    global cap
+    try:
+        cap = cv2.VideoCapture(0)
+        if not cap.isOpened():
+            print("无法打开摄像头")
+            # 此时检测器和跟踪器尚未初始化，无需清理
+            return
+    except Exception as e:
+        print(f"摄像头初始化错误: {e}")
+        cleanup_resources()
         return
 
     # 设置缓冲区大小, 越小延迟越低, 但可能会丢失帧
@@ -273,8 +275,26 @@ def main():
 
 # 全局变量存储当前帧
 current_frame = None
+cap = None  # 全局摄像头对象
+
+def cleanup_resources():
+    """释放所有资源"""
+    print("清理资源...")
+    global cap
+    if cap is not None:
+        cap.release()
+    cv2.destroyAllWindows()
 
 if __name__ == '__main__':
+    # 设置信号处理
+    import signal
+    def handle_signal(signum, frame):
+        cleanup_resources()
+        exit(0)
+    
+    signal.signal(signal.SIGINT, handle_signal)  # Ctrl+C
+    signal.signal(signal.SIGTERM, handle_signal)  # kill命令
+
     # 启动Flask服务器
     from flask import Flask, Response
     app = Flask(__name__)
