@@ -64,7 +64,7 @@ def update_log_panel(panel, logs, max_logs=MAX_LOG_DISPLAY):
     # 设置固定列宽为屏幕1/3
     # col_width = panel.shape[1] // 3  # 使用面板实际宽度计算列宽
     # col_width = 340  # 固定列宽为340px
-    col_width = 640  # 固定列宽为640px
+    col_width = 660  # 固定列宽为640px
     col_width2 = 1280  # 固定2列宽为1280px
     
     # 绘制表头（与create_log_panel列标题对齐）
@@ -89,8 +89,8 @@ def update_log_panel(panel, logs, max_logs=MAX_LOG_DISPLAY):
 
             # 调整列宽匹配文字显示需求
             panel = put_chinese_text(panel, behavior, (10, y), text_size=16)
-            panel = put_chinese_text(panel, recognized, (col_width , y), text_size=16)  # 行为分析列宽扩展至340px
-            panel = put_chinese_text(panel, time_str, (col_width2 , y), text_size=16)  # 识别时间列左移
+            panel = put_chinese_text(panel, recognized, (col_width , y), text_size=16) 
+            panel = put_chinese_text(panel, time_str, (col_width2 , y), text_size=16)  
     
     return panel
 
@@ -260,14 +260,11 @@ def main():
 
         # 按ESC退出
         if cv2.waitKey(1) & 0xFF == 27:
+            cap.release()
+            cv2.destroyAllWindows()
             break
 
-        # 按ESC退出
-        if cv2.waitKey(1) & 0xFF == 27:
-            break
-
-    cap.release()
-    cv2.destroyAllWindows()
+    # 资源释放已在ESC检测中处理
 
 # 全局变量存储当前帧
 current_frame = None
