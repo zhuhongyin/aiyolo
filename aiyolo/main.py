@@ -75,9 +75,9 @@ def update_log_panel(panel, logs, max_logs=MAX_LOG_DISPLAY):
 
     # 显示最新日志（倒序显示），动态计算行高
         visible_logs = logs[-max_logs:]
-        text_height = 20  # 根据text_size=16调整，预留4px边距
+        text_height = 24  # 根据text_size=16调整，增加边距
         for i, log in enumerate(reversed(visible_logs)):
-            y = 90 + i * (text_height + 8)  # 行高=文字高度+8px间距
+            y = 50 + i * (text_height + 10)  # 调整起始位置和行间距
             try:
                 # 取消截断限制，通过调整列宽保证显示
                 behavior = log['behavior']
@@ -89,7 +89,7 @@ def update_log_panel(panel, logs, max_logs=MAX_LOG_DISPLAY):
 
             # 调整列宽匹配文字显示需求
             panel = put_chinese_text(panel, behavior, (10, y), text_size=16)
-            panel = put_chinese_text(panel, recognized, (col_width , y), text_size=16) 
+            panel = put_chinese_text(panel, recognized, (col_width + 30 , y), text_size=16) 
             panel = put_chinese_text(panel, time_str, (col_width2 , y), text_size=16)  
     
     return panel
@@ -113,6 +113,11 @@ def main():
     cap = cv2.VideoCapture(0)
     if not cap.isOpened():
         print("无法打开摄像头")
+        # 清理已分配的资源
+        # if 'detector' in locals():
+        #     del detector
+        # if 'tracker' in locals():
+        #     del tracker
         return
 
     # 设置缓冲区大小, 越小延迟越低, 但可能会丢失帧
