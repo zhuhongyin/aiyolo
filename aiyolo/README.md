@@ -163,3 +163,123 @@ python main.py
 2. 确保有可用的摄像头设备
 3. 确保模型文件存在于正确位置
 4. 系统需要Python 3.7+环境 
+
+
+## 核心算法
+
+### 1. 目标检测算法
+系统采用YOLO（You Only Look Once）目标检测算法，具体实现：
+- 使用YOLO11作为基础检测模型
+- 支持多类别目标检测，包括人员和违禁物品
+- 使用置信度阈值（0.3）过滤低置信度检测结果
+- 采用置信度平滑处理，减少检测框闪烁
+- 支持实时目标检测和跟踪
+
+### 2. 目标跟踪算法
+系统使用自定义的SimpleTracker进行目标跟踪，主要特点：
+
+#### 核心参数：
+- 最大轨迹长度：60帧
+- 最大未匹配帧数：55帧
+- 最大匹配距离：50像素
+- 轨迹匹配权重：距离(0.3) + IOU(0.7)
+
+#### 跟踪流程：
+1. 目标匹配
+   - 计算检测框与现有轨迹的中心点距离
+   - 计算检测框与现有轨迹的IOU
+   - 综合距离和IOU得分进行最优匹配
+   - 考虑目标类别一致性
+
+2. 轨迹管理
+   - 维护目标ID和类别信息
+   - 使用deque存储历史轨迹（最大60帧）
+   - 计算目标运动速度
+   - 预测目标未来位置
+
+3. 状态更新
+   - 更新匹配成功的轨迹
+   - 创建新检测目标的轨迹
+   - 处理未匹配轨迹的missed计数
+   - 删除长时间未匹配的轨迹
+
+#### 关键算法实现：
+```python
+# 速度计算
+def calculate_velocity(self, trajectory):
+    if len(trajectory) < 2:
+        return (0, 0)
+    current = trajectory[-1]
+    previous = trajectory[-2]
+    current_center = self.calculate_center(current)
+    previous_center = self.calculate_center(previous)
+    dt = time.time() - self.last_time
+    vx = (current_center[0] - previous_center[0]) / dt
+    vy = (current_center[1] - previous_center[1]) / dt
+    return (vx, vy)
+
+# 未来位置预测
+def predict_future_position(self, current_bbox, velocity, seconds=5):
+    center_x = (current_bbox[0] + current_bbox[2]) // 2
+    center_y = (current_bbox[1] + current_bbox[3]) // 2
+    future_x = center_x + velocity[0] * seconds
+    future_y = center_y + velocity[1] * seconds
+    width = current_bbox[2] - current_bbox[0]
+    height = current_bbox[3] - current_bbox[1]
+    return (
+        int(future_x - width/2),
+        int(future_y - height/2),
+        int(future_x + width/2),
+        int(future_y + height/2)
+    )
+```
+
+### 3. 安全区域预警算法
+系统实现了基于轨迹预测的安全区域预警机制：
+
+#### 预警流程：
+1. 轨迹预测
+   - 基于历史轨迹计算目标速度
+   - 预测目标5秒后的位置
+   - 保持目标尺寸不变，仅预测中心点位置
+
+2. 预警判断
+   - 检查目标当前位置是否在安全区域内
+   - 检查预测位置是否在安全区域内
+   - 根据检测结果更新预警状态
+
+3. 预警处理
+   - 更新日志面板显示
+   - 记录预警信息到日志文件
+   - 触发相应的处理流程
+
+#### 预警逻辑：
+```python
+# 安全区域判断
+def is_in_safe_zone(bbox, safe_zone):
+    x, y = (bbox[0] + bbox[2]) // 2, (bbox[1] + bbox[3]) // 2
+    return (safe_zone[0] <= x <= safe_zone[2] and 
+            safe_zone[1] <= y <= safe_zone[3])
+
+# 预警状态更新
+if current_in_zone:
+    update_status("已进入安全区域")
+elif predicted_in_zone:
+    update_status("即将进入安全区域")
+```
+
+## 性能优化
+1. 检测优化
+   - 使用置信度平滑减少误检
+   - 优化检测阈值提高准确率
+   - 支持模型量化提升速度
+
+2. 跟踪优化
+   - 使用运动预测减少跟踪丢失
+   - 优化ID分配策略
+   - 处理目标遮挡情况
+
+3. 预警优化
+   - 多级预警机制
+   - 预警去重处理
+   - 预警时间窗口控制
