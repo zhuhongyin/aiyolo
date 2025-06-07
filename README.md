@@ -40,7 +40,7 @@ pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 python aiyolo/main.py
 ```
 
-- 按ESC键退出程序
+- 程序启动后http://localhost:5000/video_feed 可以看到视频流
 - 红色矩形框表示安全区域
 - 绿色框表示检测到的目标
 - 绿色线条表示目标运动轨迹
