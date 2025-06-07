@@ -47,7 +47,7 @@ MAX_LOG_DISPLAY = 50
 def update_log_panel(panel):
     col_width = panel.shape[1] // 3
     for i, item in enumerate(SAFETY_ITEMS):
-        y = 50 + i * 40
+        y = 50 + i * 36
         panel = put_chinese_text(panel, item['behavior'], (20, y))
         recognized_text = "是" if item['recognized'] else "否"
         panel = put_chinese_text(panel, recognized_text, 
@@ -158,7 +158,8 @@ def main():
 
             # 提取类别名称（用于区分人员/违禁物品）
             class_name = obj['class_name']
-            is_person = class_name == "人员"
+            # is_person = class_name == "人员"
+            is_person = class_name == "person"
             
             # 更新固定行为条目
             behavior_keys = [
