@@ -44,54 +44,16 @@ def create_log_panel(width, height):
 BACKGROUND_COLOR = 240
 MAX_LOG_DISPLAY = 50
 
-def update_log_panel(panel, logs, max_logs=MAX_LOG_DISPLAY):
-    """
-    更新日志面板
-    Args:
-        panel: 日志面板图像
-        logs: 日志列表
-        max_logs: 最大显示日志条数，默认50条
-    """
-    if not logs:
-        return panel  # 提前返回空日志情况
-
-    # 设置背景
-    panel[:] = BACKGROUND_COLOR
-
-    # 绘制标题
-    # panel = put_chinese_text(panel, "行为分析日志", (10, 10), text_size=24)
-
-    # 设置固定列宽为屏幕1/3
-    # col_width = panel.shape[1] // 3  # 使用面板实际宽度计算列宽
-    # col_width = 340  # 固定列宽为340px
-    col_width = 660  # 固定列宽为640px
-    col_width2 = 1280  # 固定2列宽为1280px
-    
-    # 绘制表头（与create_log_panel列标题对齐）
-    headers = ["行为分析", "已识别", "识别时间"]
-    for i, header in enumerate(headers):
-        x = i * col_width + 10  # 根据1/3宽度计算位置
-        panel = put_chinese_text(panel, header, (x, 20), text_size=18)  # 调整y坐标适应无标题
-
-    # 显示最新日志（倒序显示），动态计算行高
-        visible_logs = logs[-max_logs:]
-        text_height = 24  # 根据text_size=16调整，增加边距
-        for i, log in enumerate(reversed(visible_logs)):
-            y = 50 + i * (text_height + 10)  # 调整起始位置和行间距
-            try:
-                # 取消截断限制，通过调整列宽保证显示
-                behavior = log['behavior']
-                recognized = log['recognized']
-                time_str = log['time']
-            except KeyError as e:
-                print(f"Missing key in log entry: {e}")
-                continue
-
-            # 调整列宽匹配文字显示需求
-            panel = put_chinese_text(panel, behavior, (10, y), text_size=16)
-            panel = put_chinese_text(panel, recognized, (col_width + 30 , y), text_size=16) 
-            panel = put_chinese_text(panel, time_str, (col_width2 , y), text_size=16)  
-    
+def update_log_panel(panel):
+    col_width = panel.shape[1] // 3
+    for i, item in enumerate(SAFETY_ITEMS):
+        y = 50 + i * 40
+        panel = put_chinese_text(panel, item['behavior'], (20, y))
+        recognized_text = "是" if item['recognized'] else "否"
+        panel = put_chinese_text(panel, recognized_text, 
+                               (col_width + 20, y))
+        panel = put_chinese_text(panel, item['time'], 
+                               (2*col_width + 20, y))
     return panel
 
 def write_log_to_file(log_entry):
@@ -167,6 +129,15 @@ def main():
     # 初始化日志列表（使用deque限制最大长度）
     from collections import deque
     logs = deque(maxlen=50)  # 最多保存50条日志
+
+    SAFETY_ITEMS = [
+        {'behavior': '已识别【人员】', 'recognized': False, 'time': ''},
+        {'behavior': '已识别【违禁物品】', 'recognized': False, 'time': ''},
+        {'behavior': '已识别【人员】进入安全区域', 'recognized': False, 'time': ''},
+        {'behavior': '已识别【违禁物品】进入安全区域', 'recognized': False, 'time': ''},
+        {'behavior': '已识别【人员】即将进入安全区域', 'recognized': False, 'time': ''},
+        {'behavior': '已识别【违禁物品】即将进入安全区域', 'recognized': False, 'time': ''}
+    ]
 
     while True:
         ret, frame = cap.read()
@@ -278,20 +249,33 @@ cap = None  # 全局摄像头对象
 def cleanup_resources():
     """释放所有资源"""
     print("清理资源...")
-    global cap
+    global cap, current_frame  # 显式重置相关全局变量
     if cap is not None:
         cap.release()
     cv2.destroyAllWindows()
+    current_frame = None  # 添加此行
 
 if __name__ == '__main__':
     # 设置信号处理
     import signal
     def handle_signal(signum, frame):
         cleanup_resources()
+        # 等待IO操作完成（可选）
+        time.sleep(0.5)  
         exit(0)
     
     signal.signal(signal.SIGINT, handle_signal)  # Ctrl+C
     signal.signal(signal.SIGTERM, handle_signal)  # kill命令
+
+    # 启动Flask服务器前检查端口
+    import socket
+    def is_port_in_use(port):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            return s.connect_ex(('localhost', port)) == 0
+
+    if is_port_in_use(5000):
+        print("警告：端口5000已被占用，尝试释放...")
+        # 这里可以添加平台相关的端口释放命令（如Windows用netstat查找PID并终止）
 
     # 启动Flask服务器
     from flask import Flask, Response
@@ -299,11 +283,17 @@ if __name__ == '__main__':
 
     def generate_frames():
         while True:
-            if current_frame is not None:
-                # 编码为JPEG格式
-                ret, buffer = cv2.imencode('.jpg', current_frame)
-                frame = buffer.tobytes()
-                yield (b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+            # 添加空值保护
+            if current_frame is not None and not isinstance(current_frame, type(None)):
+                try:
+                    ret, buffer = cv2.imencode('.jpg', current_frame)
+                    if ret:  # 只有编码成功时才生成帧
+                        yield (b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+                except Exception as e:
+                    print(f"帧编码错误: {e}")
+                    time.sleep(0.1)  # 防止CPU过载
+            else:
+                time.sleep(0.1)
 
     @app.route('/video_feed')
     def video_feed():
