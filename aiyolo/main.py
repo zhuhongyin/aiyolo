@@ -130,15 +130,6 @@ def main():
     from collections import deque
     logs = deque(maxlen=50)  # 最多保存50条日志
 
-    SAFETY_ITEMS = [
-        {'behavior': '已识别【人员】', 'recognized': False, 'time': ''},
-        {'behavior': '已识别【违禁物品】', 'recognized': False, 'time': ''},
-        {'behavior': '已识别【人员】进入安全区域', 'recognized': False, 'time': ''},
-        {'behavior': '已识别【违禁物品】进入安全区域', 'recognized': False, 'time': ''},
-        {'behavior': '已识别【人员】即将进入安全区域', 'recognized': False, 'time': ''},
-        {'behavior': '已识别【违禁物品】即将进入安全区域', 'recognized': False, 'time': ''}
-    ]
-
     while True:
         ret, frame = cap.read()
         if not ret:
@@ -167,59 +158,47 @@ def main():
 
             # 提取类别名称（用于区分人员/违禁物品）
             class_name = obj['class_name']
+            is_person = class_name == "人员"
+            
+            # 更新固定行为条目
+            behavior_keys = [
+                '已识别【人员】',
+                '已识别【违禁物品】',
+                '已识别【人员】进入安全区域',
+                '已识别【违禁物品】进入安全区域',
+                '已识别【人员】即将进入安全区域',
+                '已识别【违禁物品】即将进入安全区域'
+            ]
             
             # 基础识别事件（已识别【人员】/【违禁物品】）
-            base_behavior = f"已识别【{class_name}】" if class_name in ["人员", "违禁物品"] else ""
-            if base_behavior:
-                current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                logs.append({
-                    'behavior': base_behavior,
-                    'recognized': "是",
-                    'time': current_time
-                })
+            base_behavior = '已识别【人员】' if is_person else '已识别【违禁物品】'
+            for item in SAFETY_ITEMS:
+                if item['behavior'] == base_behavior:
+                    item['recognized'] = True
+                    item['time'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
             # 检查预测位置是否在安全区域内（即将进入）
-            if is_in_safe_zone(obj['future_bbox'], safe_zone):
-                current_timestamp = time.time()
-                last_predicted_alert = last_predicted_alert_times.get(obj['id'], 0)
-                if obj['id'] not in predicted_alerted_objects or (current_timestamp - last_predicted_alert) > 180:
-                    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    log_entry = {
-                        'behavior': f"已识别【{class_name}】即将进入安全区域",
-                        'recognized': "是",
-                        'time': current_time
-                    }
-                    logs.append(log_entry)
-                    print(f"预警：{label} 预计5秒内将进入安全区域！")
-                    predicted_alerted_objects.add(obj['id'])
-                    last_predicted_alert_times[obj['id']] = current_timestamp
-                    write_log_to_file(log_entry)
-            else:
-                if obj['id'] in predicted_alerted_objects:
-                    predicted_alerted_objects.remove(obj['id'])
+            predicted_in_zone = is_in_safe_zone(obj['future_bbox'], safe_zone)
+            behavior = ('已识别【人员】即将进入安全区域' if is_person 
+                       else '已识别【违禁物品】即将进入安全区域')
+            for item in SAFETY_ITEMS:
+                if item['behavior'] == behavior:
+                    item['recognized'] = predicted_in_zone
+                    if predicted_in_zone:
+                        item['time'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
             # 检查当前是否在安全区域内（已进入）
-            if is_in_safe_zone(obj['bbox'], safe_zone):
-                current_timestamp = time.time()
-                last_alert = last_alert_times.get(obj['id'], 0)
-                if obj['id'] not in alerted_objects or (current_timestamp - last_alert) > 180:
-                    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    log_entry = {
-                        'behavior': f"已识别【{class_name}】进入安全区域",
-                        'recognized': "是",
-                        'time': current_time
-                    }
-                    logs.append(log_entry)
-                    print(f"警告：{label} 进入安全区域！")
-                    alerted_objects.add(obj['id'])
-                    last_alert_times[obj['id']] = current_timestamp
-                    write_log_to_file(log_entry)
-            else:
-                if obj['id'] in alerted_objects:
-                    alerted_objects.remove(obj['id'])
+            current_in_zone = is_in_safe_zone(obj['bbox'], safe_zone)
+            behavior = ('已识别【人员】进入安全区域' if is_person 
+                       else '已识别【违禁物品】进入安全区域')
+            for item in SAFETY_ITEMS:
+                if item['behavior'] == behavior:
+                    item['recognized'] = current_in_zone
+                    if current_in_zone:
+                        item['time'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         # 更新日志面板
-        log_panel = update_log_panel(log_panel, list(logs))  # 修复：保存返回值以更新面板
+        log_panel = update_log_panel(log_panel)
 
         # 调整主画面大小（上半部分高度为屏幕高度-260px）
         video_height = screen_height - 260
@@ -232,9 +211,8 @@ def main():
         combined_frame = np.vstack((frame, log_panel))
 
         # 显示结果
-        # 将帧存入全局变量供Flask使用
-        global current_frame
-        current_frame = combined_frame
+        # 使用FrameManager单例存储当前帧
+        frame_manager.current_frame = combined_frame
 
         # 持续处理视频流， 在视频处理循环中，即使不需要检测按键，也需要调用这个函数来保持窗口响应。
         # 等待键盘输入 ：暂停程序执行1毫秒，等待用户按键输入
@@ -242,18 +220,50 @@ def main():
 
     # 服务器关闭时会自动调用cleanup_resources()
 
-# 全局变量存储当前帧
-current_frame = None
-cap = None  # 全局摄像头对象
+class FrameManager:
+    _instance = None
+    _current_frame = None
+    _cap = None
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(FrameManager, cls).__new__(cls)
+        return cls._instance
+    
+    @property
+    def current_frame(self):
+        return self._current_frame
+    
+    @current_frame.setter
+    def current_frame(self, value):
+        self._current_frame = value
+        
+    @property
+    def cap(self):
+        return self._cap
+    
+    @cap.setter
+    def cap(self, value):
+        self._cap = value
+
+# 创建单例实例
+frame_manager = FrameManager()
+SAFETY_ITEMS = [
+    {'behavior': '已识别【人员】', 'recognized': False, 'time': ''},
+    {'behavior': '已识别【违禁物品】', 'recognized': False, 'time': ''},
+    {'behavior': '已识别【人员】进入安全区域', 'recognized': False, 'time': ''},
+    {'behavior': '已识别【违禁物品】进入安全区域', 'recognized': False, 'time': ''},
+    {'behavior': '已识别【人员】即将进入安全区域', 'recognized': False, 'time': ''},
+    {'behavior': '已识别【违禁物品】即将进入安全区域', 'recognized': False, 'time': ''}
+]
 
 def cleanup_resources():
     """释放所有资源"""
     print("清理资源...")
-    global cap, current_frame  # 显式重置相关全局变量
-    if cap is not None:
-        cap.release()
+    if frame_manager.cap is not None:
+        frame_manager.cap.release()
     cv2.destroyAllWindows()
-    current_frame = None  # 添加此行
+    frame_manager.current_frame = None  # 添加此行
 
 if __name__ == '__main__':
     # 设置信号处理
@@ -283,7 +293,8 @@ if __name__ == '__main__':
 
     def generate_frames():
         while True:
-            # 添加空值保护
+            # 使用FrameManager获取当前帧
+            current_frame = frame_manager.current_frame
             if current_frame is not None and not isinstance(current_frame, type(None)):
                 try:
                     ret, buffer = cv2.imencode('.jpg', current_frame)
