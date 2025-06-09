@@ -19,9 +19,11 @@ class VideoProcessor:
     def initialize_camera(self):
         """初始化摄像头"""
         try:
-            cap = cv2.VideoCapture(0)
+            # cap = cv2.VideoCapture(0)
+            cap = cv2.VideoCapture("rtsp://admin:dtct123456@10.10.140.144")
             if not cap.isOpened():
                 raise Exception("无法打开摄像头")
+            # 禁用自动白平衡,提高检测的稳定性
             cap.set(cv2.CAP_PROP_AUTO_WB, 0)
             return cap
         except Exception as e:

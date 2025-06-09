@@ -3,6 +3,8 @@ import time
 from flask import Flask, Response
 from config import SERVER_HOST, SERVER_PORT
 
+# 基于 Flask 的视频流服务器，主要功能是将实时视频帧通过 HTTP 接口传输给客户端（例如网页浏览器）。
+# 它使用了 MJPEG（Motion JPEG）协议来实现视频流的推送。
 class VideoServer:
     def __init__(self, frame_manager):
         self.app = Flask(__name__)
