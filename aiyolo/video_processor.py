@@ -80,7 +80,11 @@ class VideoProcessor:
         """处理单个跟踪目标"""
         # 绘制当前边界框和标签
         label = f"{obj['class_name']} ID:{obj['id']}"
-        frame = draw_bbox(frame, obj['bbox'], label)
+        
+        # 为人员使用绿色框，其他物品使用红色框
+        color = (0, 255, 0) if obj['class_name'] == "person" else (0, 0, 255)
+        
+        frame = draw_bbox(frame, obj['bbox'], label, color)
         
         # 提取类别名称
         class_name = obj['class_name']
