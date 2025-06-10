@@ -14,7 +14,7 @@ class YOLODetector:
            0: 'person',    # 人
            39: 'bottle',   # 瓶子
            66: 'keyboard', # 键盘
-        #    33: 'suitcase' # 行李箱
+           33: 'suitcase' # 行李箱
         }
 
     def detect(self, frame):
