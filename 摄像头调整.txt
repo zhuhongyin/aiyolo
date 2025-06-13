@@ -1,0 +1,27 @@
+    # cap = cv2.VideoCapture("rtsp://admin:dtct123456@10.10.140.144")
+
+    # # 添加以下优化参数（在cap = cv2.VideoCapture之后）
+    # cap.set(cv2.CAP_PROP_BUFFERSIZE, 2)  # 减少缓冲区大小
+    # cap.set(cv2.CAP_PROP_FPS, 15)        # 限制帧率为15帧
+    # cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)  # 降低分辨率
+    # cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+
+    # # 添加网络传输协议参数（重要）
+    # # 由于 cv2.CAP_PROP_FFMPEG_FLAGS 不是已知属性，使用 OpenCV 的 VideoCapture 构造函数参数来设置 RTSP 传输协议等选项
+    # cap.release()  # 先释放之前的 VideoCapture 对象
+    # cap = cv2.VideoCapture("rtsp://admin:dtct123456@10.10.140.144?rtsp_transport=tcp&buffer_size=1024&timeout=5000000")
+    # 重新设置优化参数
+    # cap.set(cv2.CAP_PROP_BUFFERSIZE, 2)  # 减少缓冲区大小
+    cap.set(cv2.CAP_PROP_FPS, 15)        # 限制帧率为15帧
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)  # 降低分辨率
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+
+    jiashuan
+
+    # 设置缓冲区大小
+    # cap.set(cv2.CAP_PROP_BUFFERSIZE, 10)
+    # # 禁用自动白平衡
+    # cap.set(cv2.CAP_PROP_AUTO_WB, 0)
+    # # 设置视频编码
+    # cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter.fourcc(*'X264'))
+    # assert cap.isOpened(), "Error reading video file"
